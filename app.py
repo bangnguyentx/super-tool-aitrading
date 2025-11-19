@@ -1,6 +1,11 @@
-# trading-signals-website/app.py
+#!/usr/bin/env python3
+print("🚀 Starting Trading Signals Website...")
+print(f"Python version: {__import__('sys').version}")
+print(f"Working directory: {__import__('os').getcwd()}")
+print("=" * 50)
 
 import os
+import sys
 import json
 import threading
 import logging
