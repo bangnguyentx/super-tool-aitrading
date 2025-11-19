@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Sidebar -->
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#signals" onclick="showSection('signals')">
+                            <i class="fas fa-signal me-2"></i>Tín hiệu
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#stats" onclick="showSection('stats')">
+                            <i class="fas fa-chart-bar me-2"></i>Thống kê
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#benefits" onclick="showSection('benefits')">
+                            <i class="fas fa-crown me-2"></i>Quyền lợi
+                        </a>
+                    </li>
+                    {% if session.user.is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link text-warning" href="#admin" onclick="showSection('admin')">
+                            <i class="fas fa-shield-alt me-2"></i>Admin Panel
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <!-- Tín hiệu Section -->
+            <div id="signals-section" class="section">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2"><i class="fas fa-signal me-2"></i>Tín hiệu giao dịch</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshSignals()">
+                                <i class="fas fa-sync-alt me-1"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <select class="form-select" id="timeframeFilter">
+                            <option value="all">Tất cả timeframe</option>
+                            <option value="scalping">Scalping</option>
+                            <option value="intraday">Intraday</option>
+                            <option value="swing">Swing</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="directionFilter">
+                            <option value="all">LONG/SHORT</option>
+                            <option value="LONG">Chỉ LONG</option>
+                            <option value="SHORT">Chỉ SHORT</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="statusFilter">
+                            <option value="active">Đang hoạt động</option>
+                            <option value="all">Tất cả</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Signals Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover" id="signalsTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Coin</th>
+                                <th>Hướng</th>
+                                <th>Entry</th>
+                                <th>TP</th>
+                                <th>SL</th>
+                                <th>RR</th>
+                                <th>Combo</th>
+                                <th>Vote</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signalsBody">
+                            <!-- Signals will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Thống kê Section -->
+            <div id="stats-section" class="section d-none">
+                <!-- Statistics content -->
+            </div>
+
+            <!-- Quyền lợi Section -->
+            <div id="benefits-section" class="section d-none">
+                <!-- Benefits content -->
+            </div>
+
+            <!-- Admin Section -->
+            {% if session.user.is_admin %}
+            <div id="admin-section" class="section d-none">
+                <!-- Admin panel content -->
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</div>
+
+<!-- Combo Details Modal -->
+<div class="modal fade" id="comboModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="comboModalTitle">Chi tiết Combo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="comboModalBody">
+                <!-- Combo details will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
