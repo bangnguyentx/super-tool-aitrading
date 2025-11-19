@@ -3,15 +3,15 @@ services:
     name: trading-signals-website
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 120
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.9.0
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_PASSWORD
-        value: "Bang@0708"  # 
+        value: "Bang@0708"
       - key: INTERVAL
         value: "15m"
       - key: LIMIT
