@@ -4,11 +4,17 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_PASSWORD
-        generateValue: true
+        value: "Bang@0708"  # 
+      - key: INTERVAL
+        value: "15m"
+      - key: LIMIT
+        value: "500"
+      - key: RENDER
+        value: "true"
