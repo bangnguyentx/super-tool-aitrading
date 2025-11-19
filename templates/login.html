@@ -12,17 +12,36 @@
                         <p class="text-muted">Nhập key để tiếp tục</p>
                     </div>
 
+                    <!-- Hiển thị thông báo lỗi -->
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    {% if error %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        {{ error }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endif %}
+
                     <form method="POST" id="loginForm">
                         <div class="mb-3">
                             <label class="form-label">Nickname</label>
                             <input type="text" class="form-control" name="nickname" required 
-                                   placeholder="Nhập nickname của bạn">
+                                   placeholder="Nhập nickname của bạn" value="{{ request.form.nickname if request.form }}">
                         </div>
                         
                         <div class="mb-4">
                             <label class="form-label">Access Key</label>
                             <input type="password" class="form-control" name="access_key" required
-                                   placeholder="Nhập key truy cập">
+                                   placeholder="Nhập key truy cập" value="{{ request.form.access_key if request.form }}">
                             <div class="form-text">
                                 Key có thời hạn 24h, 1 tuần, 1 tháng, 3 tháng hoặc vĩnh viễn
                             </div>
@@ -37,6 +56,11 @@
                         <small class="text-muted">
                             Cần key? Liên hệ admin qua Facebook hoặc Telegram
                         </small>
+                        <div class="mt-2">
+                            <small class="text-info">
+                                <strong>Demo:</strong> Admin: admin / admin123
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
