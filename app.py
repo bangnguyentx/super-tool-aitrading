@@ -5,7 +5,6 @@ print(f"Working directory: {__import__('os').getcwd()}")
 print("=" * 50)
 
 import os
-import sys
 import json
 import threading
 import logging
@@ -17,7 +16,7 @@ from functools import wraps
 
 import requests
 import pandas as pd
-from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for, flash
 from apscheduler.schedulers.background import BackgroundScheduler
 from ta.trend import MACD, EMAIndicator
 from ta.momentum import RSIIndicator
@@ -25,8 +24,7 @@ from ta.volatility import BollingerBands, AverageTrueRange
 
 from config import (
     COINS, INTERVAL, LIMIT, SQUEEZE_THRESHOLD, COOLDOWN_MINUTES,
-    ADMIN_USERNAME, ADMIN_PASSWORD, SECRET_KEY, KEY_TYPES, COMBO_DETAILS,
-    THEME_COLORS, LANGUAGES
+    ADMIN_USERNAME, ADMIN_PASSWORD, SECRET_KEY, KEY_TYPES, COMBO_DETAILS
 )
 
 # =============================================================================
@@ -45,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
+app.config['SESSION_TYPE'] = 'filesystem'
 
 # Thread safety
 data_lock = threading.Lock()
@@ -55,7 +54,7 @@ KEYS_FILE = 'access_keys.json'
 USERS_FILE = 'users.json'
 
 # =============================================================================
-# AUTHENTICATION & AUTHORIZATION
+# AUTHENTICATION & AUTHORIZATION - ĐÃ SỬA
 # =============================================================================
 
 def login_required(f):
@@ -70,60 +69,76 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session or not session['user'].get('is_admin', False):
-            return jsonify({"error": "Admin access required"}), 403
+            flash('Bạn cần quyền admin để truy cập trang này!', 'error')
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 # =============================================================================
-# DATA MANAGEMENT
+# DATA MANAGEMENT - ĐÃ SỬA
 # =============================================================================
 
-def load_json_file(filename, default=None):
-    """Load JSON file with error handling"""
-    if default is None:
-        default = {}
+def init_data_files():
+    """Khởi tạo file data nếu chưa tồn tại"""
+    files = [DATA_FILE, KEYS_FILE, USERS_FILE]
+    defaults = [
+        {"signals": [], "stats": {}},
+        {"keys": {}},
+        {"users": {}}
+    ]
+    
+    for file, default in zip(files, defaults):
+        if not os.path.exists(file):
+            with open(file, 'w', encoding='utf-8') as f:
+                json.dump(default, f, indent=2, ensure_ascii=False)
+            logger.info(f"✅ Đã tạo file: {file}")
+
+def load_json_file(filename):
+    """Load JSON file với xử lý lỗi"""
     try:
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading {filename}: {e}")
-    return default
+        with open(filename, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        logger.warning(f"⚠️ File {filename} không tồn tại hoặc lỗi, tạo mới")
+        return {}
 
 def save_json_file(filename, data):
-    """Save JSON file with error handling"""
+    """Save JSON file với xử lý lỗi"""
     try:
         with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
         return True
     except Exception as e:
-        logger.error(f"Error saving {filename}: {e}")
+        logger.error(f"❌ Lỗi lưu file {filename}: {e}")
         return False
 
 def load_data():
-    return load_json_file(DATA_FILE, {"signals": [], "stats": {}})
+    return load_json_file(DATA_FILE) or {"signals": [], "stats": {}}
 
 def save_data(data):
     return save_json_file(DATA_FILE, data)
 
 def load_keys():
-    return load_json_file(KEYS_FILE, {"keys": {}})
+    return load_json_file(KEYS_FILE) or {"keys": {}}
 
 def save_keys(keys_data):
     return save_json_file(KEYS_FILE, keys_data)
 
 def load_users():
-    return load_json_file(USERS_FILE, {"users": {}})
+    return load_json_file(USERS_FILE) or {"users": {}}
 
 def save_users(users_data):
     return save_json_file(USERS_FILE, users_data)
 
 # =============================================================================
-# KEY MANAGEMENT
+# KEY MANAGEMENT - ĐÃ SỬA HOÀN TOÀN
 # =============================================================================
 
 def generate_key(key_type):
-    """Generate a new access key"""
+    """Tạo key mới"""
+    if key_type not in KEY_TYPES:
+        return None
+        
     key_data = {
         "key": secrets.token_urlsafe(16),
         "type": key_type,
@@ -137,41 +152,129 @@ def generate_key(key_type):
     return key_data
 
 def validate_key(access_key, nickname):
-    """Validate access key and nickname"""
-    keys_data = load_keys()
-    users_data = load_users()
-    
-    # Find the key
-    for key_id, key_data in keys_data.get("keys", {}).items():
-        if (key_data["key"] == access_key and 
-            key_data["is_active"] and 
-            datetime.fromisoformat(key_data["expires_at"]) > datetime.now(timezone.utc)):
+    """Validate key với xử lý lỗi chi tiết"""
+    try:
+        if not access_key or not nickname:
+            return False, "Vui lòng nhập đầy đủ nickname và key"
             
-            # Check if key is already used
-            if key_data["used_by"] is None:
-                # First time use - assign to nickname
-                key_data["used_by"] = nickname
-                key_data["used_at"] = datetime.now(timezone.utc).isoformat()
-                keys_data["keys"][key_id] = key_data
-                save_keys(keys_data)
+        keys_data = load_keys()
+        users_data = load_users()
+        
+        # Tìm key phù hợp
+        for key_id, key_data in keys_data.get("keys", {}).items():
+            if key_data.get("key") == access_key:
+                # Kiểm tra key có active không
+                if not key_data.get("is_active", True):
+                    return False, "Key đã bị vô hiệu hóa"
                 
-                # Create user record
-                users_data["users"][nickname] = {
-                    "key_id": key_id,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "last_login": datetime.now(timezone.utc).isoformat(),
-                    "is_admin": False
-                }
-                save_users(users_data)
-                return True
+                # Kiểm tra thời hạn
+                expires_at = datetime.fromisoformat(key_data["expires_at"])
+                if expires_at < datetime.now(timezone.utc):
+                    return False, "Key đã hết hạn"
                 
-            elif key_data["used_by"] == nickname:
-                # Existing user - update last login
-                users_data["users"][nickname]["last_login"] = datetime.now(timezone.utc).isoformat()
-                save_users(users_data)
-                return True
+                # Kiểm tra đã được sử dụng chưa
+                used_by = key_data.get("used_by")
+                if used_by is None:
+                    # Lần đầu sử dụng - gán nickname
+                    key_data["used_by"] = nickname
+                    key_data["used_at"] = datetime.now(timezone.utc).isoformat()
+                    keys_data["keys"][key_id] = key_data
+                    
+                    # Tạo user mới
+                    users_data["users"][nickname] = {
+                        "key_id": key_id,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "last_login": datetime.now(timezone.utc).isoformat(),
+                        "is_admin": False
+                    }
+                    
+                    save_keys(keys_data)
+                    save_users(users_data)
+                    return True, "Đăng nhập thành công"
+                    
+                elif used_by == nickname:
+                    # User cũ - cập nhật last login
+                    users_data["users"][nickname]["last_login"] = datetime.now(timezone.utc).isoformat()
+                    save_users(users_data)
+                    return True, "Đăng nhập thành công"
+                else:
+                    return False, f"Key đã được sử dụng bởi nickname: {used_by}"
+        
+        return False, "Key không tồn tại"
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi validate key: {e}")
+        return False, "Lỗi hệ thống khi xác thực key"
+
+# =============================================================================
+# FLASK ROUTES - ĐÃ SỬA HOÀN TOÀN
+# =============================================================================
+
+@app.route('/')
+def index():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    # Xóa session cũ
+    session.clear()
     
-    return False
+    if request.method == 'POST':
+        nickname = request.form.get('nickname', '').strip()
+        access_key = request.form.get('access_key', '').strip()
+        
+        logger.info(f"🔐 Login attempt: {nickname}")
+        
+        # Admin login
+        if nickname == ADMIN_USERNAME and access_key == ADMIN_PASSWORD:
+            session['user'] = {
+                'nickname': nickname,
+                'is_admin': True,
+                'login_time': datetime.now(timezone.utc).isoformat()
+            }
+            session.permanent = True
+            logger.info(f"✅ Admin login successful: {nickname}")
+            return redirect(url_for('dashboard'))
+        
+        # User login với key
+        is_valid, message = validate_key(access_key, nickname)
+        
+        if is_valid:
+            session['user'] = {
+                'nickname': nickname,
+                'is_admin': False,
+                'login_time': datetime.now(timezone.utc).isoformat()
+            }
+            session.permanent = True
+            logger.info(f"✅ User login successful: {nickname}")
+            return redirect(url_for('dashboard'))
+        else:
+            logger.warning(f"❌ Login failed: {nickname} - {message}")
+            flash(message, 'error')
+            return render_template('login.html', error=message)
+    
+    return render_template('login.html')
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    try:
+        user_data = session.get('user', {})
+        return render_template('dashboard.html', user=user_data)
+    except Exception as e:
+        logger.error(f"❌ Dashboard error: {e}")
+        flash('Lỗi khi tải dashboard', 'error')
+        return redirect(url_for('login'))
+
+@app.route('/logout')
+def logout():
+    username = session.get('user', {}).get('nickname', 'Unknown')
+    session.clear()
+    logger.info(f"🚪 User logged out: {username}")
+    flash('Đã đăng xuất thành công', 'success')
+    return redirect(url_for('login'))
 
 # =============================================================================
 # TRADING ENGINE (giữ nguyên từ code trước)
@@ -733,54 +836,6 @@ def combo18_support_resistance_break_retest(df):
         logger.error(f"Combo18 error: {e}")
     
     return None
-
-# =============================================================================
-# FLASK ROUTES
-# =============================================================================
-
-@app.route('/')
-def index():
-    if 'user' in session:
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        nickname = request.form.get('nickname', '').strip()
-        access_key = request.form.get('access_key', '').strip()
-        
-        # Admin login
-        if nickname == ADMIN_USERNAME and access_key == ADMIN_PASSWORD:
-            session['user'] = {
-                'nickname': nickname,
-                'is_admin': True,
-                'login_time': datetime.now(timezone.utc).isoformat()
-            }
-            return redirect(url_for('dashboard'))
-        
-        # User login with key
-        if validate_key(access_key, nickname):
-            session['user'] = {
-                'nickname': nickname,
-                'is_admin': False,
-                'login_time': datetime.now(timezone.utc).isoformat()
-            }
-            return redirect(url_for('dashboard'))
-        else:
-            return render_template('login.html', error="Key không hợp lệ hoặc đã được sử dụng bởi nickname khác")
-    
-    return render_template('login.html')
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html', user=session['user'])
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
 
 # =============================================================================
 # API ROUTES
