@@ -8,13 +8,8 @@ from datetime import timedelta
 # =============================================================================
 
 COINS = [
-    # Major coins
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT",
-    # Mid caps
-    "MATICUSDT", "LTCUSDT", "ATOMUSDT", "UNIUSDT", "FILUSDT",
-    # Small caps
-    "NEARUSDT", "ALGOUSDT", "ETCUSDT", "XLMUSDT", "EGLDUSDT"
+    "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "LINKUSDT"
 ]
 
 INTERVAL = os.getenv("INTERVAL", "15m")
@@ -26,40 +21,21 @@ COOLDOWN_MINUTES = int(os.getenv("COOLDOWN_MINUTES", "30"))
 # CẤU HÌNH WEBSITE & BẢO MẬT
 # =============================================================================
 
-# Admin credentials
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 
-# Session settings
-SESSION_TIMEOUT = timedelta(hours=24)
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
-
-# Key types and durations (in hours)
+# Key types và durations (giờ)
 KEY_TYPES = {
     "24h": 24,
     "1w": 168,
     "1m": 720,
     "3m": 2160,
-    "forever": 876000  # ~100 years
+    "forever": 876000
 }
 
 # =============================================================================
-# CẤU HÌNH GIAO DIỆN
-# =============================================================================
-
-THEME_COLORS = {
-    "primary": "#6366f1",
-    "secondary": "#8b5cf6", 
-    "success": "#10b981",
-    "danger": "#ef4444",
-    "warning": "#f59e0b",
-    "info": "#3b82f6",
-    "dark": "#1f2937",
-    "light": "#f8fafc"
-}
-
-# =============================================================================
-# MÔ TẢ COMBO CHI TIẾT
+# MÔ TẢ COMBO
 # =============================================================================
 
 COMBO_DETAILS = {
@@ -69,19 +45,5 @@ COMBO_DETAILS = {
         "rr_ratio": "1:3",
         "timeframe": "15m-1h",
         "success_rate": "72%"
-    },
-    "MACD Order Block Retest": {
-        "description": "MACD Cross kết hợp retest Order Block",
-        "conditions": "MACD histogram chuyển dương, Retest OB trong 0.5 ATR",
-        "rr_ratio": "1:2.5", 
-        "timeframe": "1h-4h",
-        "success_rate": "68%"
-    },
-    # ... thêm các combo khác với cùng cấu trúc
-}
-
-# Ngôn ngữ
-LANGUAGES = {
-    'en': 'English',
-    'vi': 'Tiếng Việt'
+    }
 }
